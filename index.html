@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon" />
+    <script src="./template.js"></script>
+  </head>
+  <body>
+    <template id="Mountable">
+      <h2>foobar</h2>
+    </template>
+    <script>
+      class Test {
+        constructor(name, fn) {
+          this.name = name;
+          this.fn = fn;
+        }
+        async run() {
+          await this.fn();
+        }
+      }
+      const tests = [
+        new Test("mounts to page", async () => {
+          class Mountable extends Template {
+            constructor() {
+              super("Mountable");
+              this.foobar = this.fragment.querySelector("h2");
+            }
+          }
+          const instance = new Mountable();
+          const node = document.createElement("div");
+          document.body.appendChild(node);
+          instance.mount(node);
+          if (instance.foobar === null) {
+            throw new Error("Unable to find mounted component");
+          }
+          instance.unmount();
+        }),
+        new Test("emitters work", async () => {
+          const t = new Template();
+          const one = new Promise((resolve, reject) => {
+            t.on("foo", resolve);
+            setTimeout(reject, 100);
+          });
+          const two = new Promise((resolve, reject) => {
+            t.on("foo", resolve);
+            setTimeout(reject, 100);
+          });
+          const three = new Promise((resolve, reject) => {
+            t.on("bar", resolve);
+            setTimeout(reject, 100);
+          });
+          t.emit("foo");
+          t.emit("bar");
+          await Promise.all([one, two, three]);
+        }),
+        new Test("setState emits change on change", async () => {
+          const t = new Template();
+          await new Promise((resolve, reject) => {
+            t.on("change", resolve);
+            setTimeout(reject, 100);
+            t.setState({ foo: "bar" });
+          });
+        }),
+        new Test("setState does not emit change on same", async () => {
+          const t = new Template();
+          t.setState({ foo: "bar" });
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          await new Promise((resolve, reject) => {
+            t.on("change", reject);
+            t.setState({ foo: "bar" });
+            setTimeout(resolve, 100);
+          });
+        }),
+        new Test("dedupe changes", async () => {
+          const t = new Template();
+          let count = 0;
+          t.on("change", () => {
+            count++;
+          });
+          t.setState({ foo: "bar" });
+          t.setState({ buzz: "bazz" });
+          t.setState({ beep: "boop" });
+          t.setState({ bleep: "bloop" });
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          if (count !== 1) {
+            throw new Error(`Emitted ${count} changes`);
+          }
+        }),
+      ];
+      tests.forEach((test) =>
+        (async function runTest() {
+          try {
+            await test.run();
+            console.log(`PASS: ${test.name}`);
+          } catch (e) {
+            console.error(`FAIL: ${test.name}`, e);
+          }
+        })()
+      );
+    </script>
+  </body>
+</html>
